@@ -1,1 +1,4 @@
-data.cnf
+*.cnf
+*.sat
+tmp*
+decode*
