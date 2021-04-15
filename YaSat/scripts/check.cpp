@@ -15,7 +15,7 @@ auto sol(fstream &fsat, fstream &fcnf) {
 
 	// read cnf
 	fcnf >> trash >> trash >> num_vars >> num_clauses;
-	assert((size_t)num_vars == ans.size() - 1);
+	assert(static_cast<size_t>(num_vars) == ans.size() - 1);
 	while (num_clauses--) {
 		bool ok = false;
 		for (int x; fcnf >> x and x; ) if (ans[abs(x)] == x) {

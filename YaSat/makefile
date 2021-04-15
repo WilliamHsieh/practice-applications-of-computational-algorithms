@@ -1,27 +1,28 @@
-CC = g++
-FLAGS = -std=c++17 -Wall -Wextra -Wshadow -Wold-style-cast -pedantic -O3
-DEBUG = -g -Ddebug
+TARGET     := yasat
 
-OBJS = parser.o sat.o
-solver = yasat
-checker = check
+SRC_DIR    := src/
+INC_DIR    := include/
+OBJ_DIR    := obj/
+SCRIPT_DIR := scripts/
 
-all: $(solver) $(checker)
-	./$(solver) data.cnf && cat data.sat
+CC         := g++
+CCFLAGS    := -I$(INC_DIR) -std=c++17 -Ofast -Wall -Wextra -Wshadow -Wold-style-cast -DVERBOSE
 
-$(checker): check.cpp
-	$(CC) $(FLAGS) -o $(checker) check.cpp
+SRC_FILES  := $(shell find $(SRC_DIR) -type f -name '*.cpp')
+OBJ_FILES  := $(patsubst $(SRC_DIR)%.cpp,$(OBJ_DIR)%.o,$(SRC_FILES))
 
-$(solver): $(OBJS)
-	$(CC) $(FLAGS) $(OBJS) -o $(solver)
+all: $(shell mkdir -p $(OBJ_DIR)) $(TARGET)
 
-parser.o: parser.cpp parser.h
-	$(CC) $(FLAGS) -c parser.cpp
+checker: $(SCRIPT_DIR)check.cpp
+	$(CC) $(CCFLAGS) -o $@ $^
 
-sat.o: sat.cpp parser.h makefile
-	$(CC) $(FLAGS) -c sat.cpp
-# 	$(CC) $(FLAGS) $(DEBUG) -c sat.cpp
+$(TARGET): $(OBJ_FILES)
+	$(CC) $(CCFLAGS) -o $@ $^
+
+$(OBJ_DIR)%.o: $(SRC_DIR)%.cpp
+	$(shell mkdir -p $(dir $@))
+	$(CC) $(CCFLAGS) -c -o $@ $<
 
 .PHONY: clean
 clean:
-	rm -rf $(OBJS) $(solver) $(checker) a.out
+	rm -rf $(OBJ_DIR) $(TARGET) checker
