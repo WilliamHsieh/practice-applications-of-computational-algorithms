@@ -1,11 +1,9 @@
 #include <bits/stdc++.h>
 using namespace std;
 
-auto sol(fstream &fsat, fstream &fcnf) {
-	auto trash = string{};
-	int num_vars, num_clauses;
-
+auto sol(fstream &fcnf, fstream &fsat) {
 	// read sat
+	auto trash = string{};
 	fsat >> trash >> trash;
 	if (trash != "SATISFIABLE") return "[UNSAT]";
 	fsat >> trash;
@@ -14,6 +12,7 @@ auto sol(fstream &fsat, fstream &fcnf) {
 	for (int x; fsat >> x and x; ans.push_back(x));
 
 	// read cnf
+	int num_vars, num_clauses;
 	fcnf >> trash >> trash >> num_vars >> num_clauses;
 	assert(static_cast<size_t>(num_vars) == ans.size() - 1);
 	while (num_clauses--) {
@@ -30,14 +29,17 @@ auto sol(fstream &fsat, fstream &fcnf) {
 }
 
 int main(int argc, char **argv) {
-	if (argc != 2) {
+	if (argc < 2) {
 		cout << "usage: ./checker [cnf_fname_prefix]\n";
+		cout << "usage: ./checker [input.cnf] [input.sat]\n";
 		return 0;
 	}
 
-	auto fsat = fstream(string(argv[1]) + ".sat", ios::in);
-	auto fcnf = fstream(string(argv[1]) + ".cnf", ios::in);
-	cout << sol(fsat, fcnf) << endl;
+	auto cnf_fname = string(argv[1]) + (argc == 2 ? ".cnf" : "");
+	auto sat_fname = (argc == 2) ? string(argv[1]) + ".sat" : string(argv[2]);
+	auto fcnf = fstream(cnf_fname, ios::in);
+	auto fsat = fstream(sat_fname, ios::in);
+	cout << sol(fcnf, fsat) << endl;
 
 	fsat.close();
 	fcnf.close();
