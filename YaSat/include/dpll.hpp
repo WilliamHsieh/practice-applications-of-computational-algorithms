@@ -8,10 +8,7 @@
 // #Declaration
 struct DPLL {
 	DPLL(int _num_vars, vector<vector<int>> &_clauses)
-		: num_vars(_num_vars), num_clauses(_clauses.size()), clauses(_clauses)
-	{
-		init();
-	}
+		: num_vars(_num_vars), num_clauses(_clauses.size()), clauses(_clauses) {}
 	void init();
 	void watch_not_false(int&, int&, int, int);
 	bool watch_is_true(int, int);
@@ -173,6 +170,9 @@ bool DPLL::backtrack() {
 
 // #DPLL
 std::optional<std::vector<int>> DPLL::solve() {
+	// 0. init
+	init();
+
 	while (!call_stack.empty()) {
 		// 1. unit propagate
 		if (!unit_propagate()) {
