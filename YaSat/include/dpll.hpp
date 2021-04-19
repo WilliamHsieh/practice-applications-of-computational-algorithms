@@ -7,7 +7,12 @@
 
 // #Declaration
 struct DPLL {
-	void init(int, int);
+	DPLL(int _num_vars, vector<vector<int>> &_clauses)
+		: num_vars(_num_vars), num_clauses(_clauses.size()), clauses(_clauses)
+	{
+		init();
+	}
+	void init();
 	void watch_not_false(int&, int&, int, int);
 	bool watch_is_true(int, int);
 	bool unit_propagate();
@@ -19,13 +24,11 @@ struct DPLL {
 	std::queue<int> prop;
 	std::stack<int> branch;
 	std::stack<State, std::vector<State>> call_stack;
-	std::vector<std::vector<int>> clauses;
+	std::vector<std::vector<int>> &clauses;
 };
 
 // #Initialize
-void DPLL::init(int num_vars_, int num_clauses_) {
-	num_vars = num_vars_;
-	num_clauses = num_clauses_;
+void DPLL::init() {
 	assert(clauses.size() != 0);
 #ifdef DEBUG
 	for (auto &v : clauses) {
@@ -44,7 +47,7 @@ void DPLL::init(int num_vars_, int num_clauses_) {
 	});
 
 	// assign unit clauses as decision
-	auto &state = call_stack.emplace(num_vars_, num_clauses_);
+	auto &state = call_stack.emplace(num_vars, num_clauses);
 	for (size_t i = 0; i < clauses.size(); i++) {
 		if (clauses[i].size() == 1) {
 			state.watch[i] = {-1, -1};
