@@ -35,6 +35,26 @@ void DPLL::init() {
 		for (auto x : v) std::cout << x << ' '; std::cout << std::endl;
 	}
 #endif
+	// remove both -x or x exist clause && make literal unique
+	// TODO: should be written more efficient
+	for (auto &v : clauses) {
+		auto s = std::set<int>(all(v));
+		int idx = 0, ok = true;
+		for (auto x : s) {
+			if (s.count(-x)) {
+				ok = false;
+				break;
+			}
+			v[idx++] = x;
+		}
+		if (!ok) {
+			v = vector(1, 0);
+		} else {
+			v.resize(s.size());
+		}
+	}
+
+	// TODO: should be deleted after implementing pick_variable
 	std::sort(all(clauses), [](const std::vector<int> &v1, const std::vector<int> &v2) {
 		auto x1 = (v1.size() == 1 ? LLONG_MAX : v1.size());
 		auto x2 = (v2.size() == 1 ? LLONG_MAX : v2.size());
