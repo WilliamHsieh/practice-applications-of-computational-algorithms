@@ -1,6 +1,7 @@
 #include <bits/stdc++.h>
-#include "dpll.hpp"
-#include "state.hpp"
+#include "dpll.h"
+#include "state.h"
+
 
 // #Constructor
 State::State(int num_vars_, int num_clauses_)

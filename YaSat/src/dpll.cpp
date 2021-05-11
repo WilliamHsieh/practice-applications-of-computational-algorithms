@@ -1,6 +1,6 @@
 #include <bits/stdc++.h>
-#include "state.hpp"
-#include "dpll.hpp"
+#include "state.h"
+#include "dpll.h"
 #define all(x) begin(x),end(x)
 #define what_is(x) std::cout << "[what] " << #x << " is " << x << std::endl
 #define exec(x) std::cout << "[exec] " << #x << std::endl; x
