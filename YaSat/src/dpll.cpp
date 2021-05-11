@@ -1,37 +1,29 @@
-#pragma once
 #include <bits/stdc++.h>
 #include "state.hpp"
+#include "dpll.hpp"
 #define all(x) begin(x),end(x)
 #define what_is(x) std::cout << "[what] " << #x << " is " << x << std::endl
 #define exec(x) std::cout << "[exec] " << #x << std::endl; x
 
-// #Declaration
-struct DPLL {
-	DPLL(int _num_vars, vector<vector<int>> &_clauses)
-		: num_vars(_num_vars), num_clauses(_clauses.size()), clauses(_clauses) {}
-	void init();
-	void watch_not_false(int&, int&, int, int);
-	bool watch_is_true(int, int);
-	bool unit_propagate();
-	bool backtrack();
-	std::optional<std::vector<int>> solve();
+using namespace std;
 
-	int num_vars;
-	int num_clauses;
-	std::queue<int> prop;
-	std::stack<int> branch;
-	std::stack<State, std::vector<State>> call_stack;
-	std::vector<std::vector<int>> &clauses;
-};
+// #Constructor
+DPLL::DPLL(int _num_vars, vector<vector<int>> &_clauses)
+	: num_vars(_num_vars),
+	  num_clauses(_clauses.size()),
+	  clauses(_clauses),
+	  decided_level(num_vars, 0),
+	  antecedent(num_vars, 0)
+{}
 
 // #Initialize
 void DPLL::init() {
 	assert(clauses.size() != 0);
-#ifdef DEBUG
+	#ifdef DEBUG
 	for (auto &v : clauses) {
 		for (auto x : v) std::cout << x << ' '; std::cout << std::endl;
 	}
-#endif
+	#endif
 	// remove both -x or x exist clause && make literal unique
 	// TODO: should be written more efficient
 	for (auto &v : clauses) {
@@ -68,7 +60,7 @@ void DPLL::init() {
 	for (size_t i = 0; i < clauses.size(); i++) {
 		if (clauses[i].size() == 1) {
 			state.watch[i] = {-1, -1};
-			state.set_variable(clauses[i][0], prop);
+			state.set_variable(clauses[i][0], *this);
 		}
 	}
 }
@@ -102,6 +94,14 @@ bool DPLL::watch_is_true(int watched, int i) {
 	return false;
 }
 
+// #Resolve
+//auto DPLL::resolve() {
+//}
+
+// #First UIP
+//auto DPLL::FirstUIP() {
+//}
+
 // #Unit propagate
 bool DPLL::unit_propagate() {
 	auto &state = call_stack.top();
@@ -111,9 +111,10 @@ bool DPLL::unit_propagate() {
 
 		state.done = true;
 		for (int i = 0; i < num_clauses; i++) {
-			if (clauses[i].size() == 1) break;
+			//TODO: implement this back
+//			if (clauses[i].size() == 1) break;
 
-			// this clause is satisfied
+			// this clause is already satisfied
 			auto &[la, lb] = state.watch[i];
 			if (la == -1 and lb == -1) continue;
 
@@ -130,12 +131,15 @@ bool DPLL::unit_propagate() {
 			// check if this became unit clause (implication)
 			if (la == -1) std::swap(la, lb);
 			if (la != -1 and lb == -1) {
-				int tmp = clauses[i][la];
-				if (state.var(tmp) and *state.var(tmp) != (tmp > 0)) {
-					prop = {};
-					return false; //conflict
+				int last = clauses[i][la];
+
+				// conflict
+				if (state.var(last) and *state.var(last) != (last > 0)) {
+					return false;
 				}
-				state.set_variable(tmp, prop);
+
+				// imply
+				state.set_variable(last, *this);
 				la = -1;
 			}
 			if (la != -1 or lb != -1) state.done = false;
@@ -152,6 +156,9 @@ bool DPLL::unit_propagate() {
 
 // #backtrack
 bool DPLL::backtrack() {
+	// clean propagation queue
+	if (prop.size()) prop = {};
+
 //	std::cout << "propagation failed\n";
 	while (!branch.empty() and branch.top() == 0) {
 		call_stack.pop();
@@ -162,7 +169,7 @@ bool DPLL::backtrack() {
 	// make opposite decision
 	call_stack.pop();
 	call_stack.push(call_stack.top());
-	call_stack.top().set_variable(branch.top(), prop);
+	call_stack.top().set_variable(branch.top(), *this);
 	branch.top() = 0;
 
 	return true;
@@ -187,13 +194,14 @@ std::optional<std::vector<int>> DPLL::solve() {
 		// 3. if not, apply new decision
 		call_stack.push(call_stack.top());
 		int g = call_stack.top().pick_variable();
-		call_stack.top().set_variable(g, prop);
+		call_stack.top().set_variable(g, *this);
 		branch.push(-g);
 	}
 
 	// 4. SAT: return ans;
 	auto res = std::vector<int>(num_vars);
 	auto &state = call_stack.top();
+
 	for (int i = 1; i <= num_vars; i++) {
 		if (state.var(i) and *state.var(i)) {
 			res[i-1] = i;

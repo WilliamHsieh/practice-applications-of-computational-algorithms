@@ -1,20 +1,6 @@
-#pragma once
 #include <bits/stdc++.h>
-
-// #Declaration
-struct State {
-	State(int, int);
-
-	std::optional<bool>& var(int);
-	int pick_variable();
-	void set_variable(int, std::queue<int>&);
-
-	bool done;
-	int num_vars;
-	int num_clauses;
-	std::vector<std::optional<bool>> guess; //decision of each variable
-	std::vector<std::array<int, 2>> watch; //record the index of watched literal
-};
+#include "dpll.hpp"
+#include "state.hpp"
 
 // #Constructor
 State::State(int num_vars_, int num_clauses_)
@@ -49,9 +35,9 @@ int State::pick_variable() {
 }
 
 // #Set a variable
-void State::set_variable(int x, std::queue<int> &prop) {
+void State::set_variable(int x, DPLL &super) {
 	var(x) = (x > 0);
-	prop.push(-x);
+	super.prop.push(-x);
 }
 
 // #operator<<
