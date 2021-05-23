@@ -21,7 +21,7 @@ all: $(shell mkdir -p $(OBJ_DIR)) $(TARGET)
 test: $(TARGET) $(CHECKER)
 	./$(SCRIPT_DIR)test.sh
 
-$(CHECKER): $(SCRIPT_DIR)check.cpp
+$(CHECKER): $(SCRIPT_DIR)check.cpp obj/parser.o
 	$(CC) $(CCFLAGS) -o $@ $^
 
 $(TARGET): $(OBJ_FILES)
