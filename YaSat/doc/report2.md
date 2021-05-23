@@ -45,6 +45,8 @@ In this project We are going to implement a SAT solver, and these are the featur
 1. two literal watching
 2. buggy non-chronological backtracking
 
+**05/23 UPDATE**: finish non-chronological backtracking
+
 ## 1. two literal watching
 * This method drastically decrease the complexity of the unit propagation, since we at most look at all the clauses and literal __once__.
 * `prop` record all the false literal. (ex: decision on `1 == true`, imply that `1 == false` is the false literal)
