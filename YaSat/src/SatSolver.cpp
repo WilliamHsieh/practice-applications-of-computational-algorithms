@@ -1,6 +1,7 @@
 #include <bits/stdc++.h>
+#include "parser.h"
 #include "state.h"
-#include "dpll.h"
+#include "SatSolver.h"
 #define all(x) begin(x),end(x)
 #define what_is(x) std::cout << "[what] " << #x << " is " << x << std::endl
 #define exec(x) std::cout << "[exec] " << #x << std::endl; x
@@ -8,22 +9,21 @@
 using namespace std;
 
 // #Constructor
-DPLL::DPLL(int _num_vars, vector<vector<int>> &_clauses)
-	: num_vars(_num_vars),
-	  num_clauses(_clauses.size()),
-	  decision_level(num_vars + 1, 0),
-	  antecedent(num_vars + 1, -1),
-	  timestamp(num_vars + 1, -1),
-	  clauses(_clauses)
-{}
+SatSolver::SatSolver(string &fname) {
+	parse_DIMACS_CNF(clauses, num_vars, fname.data());
+	num_clauses = clauses.size();
+	decision_level.assign(num_vars + 1, 0);
+	antecedent.assign(num_vars + 1, -1);
+	timestamp.assign(num_vars + 1, -1);
+}
 
 // #Initialize
-void DPLL::init() {
+void SatSolver::init() {
 	assert(clauses.size() != 0);
 	// remove both -x or x exist clause && make literal unique
 	// TODO: should be written more efficient
 	for (auto &v : clauses) {
-		auto s = std::set<int>(all(v));
+		auto s = set<int>(all(v));
 		int idx = 0, ok = true;
 		for (auto x : s) {
 			if (s.count(-x)) {
@@ -41,7 +41,7 @@ void DPLL::init() {
 	}
 
 	// TODO: should be deleted after implementing pick_variable
-	std::sort(all(clauses), [](const std::vector<int> &v1, const std::vector<int> &v2) {
+	sort(all(clauses), [](const vector<int> &v1, const vector<int> &v2) {
 		auto x1 = (v1.size() == 1 ? LLONG_MAX : v1.size());
 		auto x2 = (v2.size() == 1 ? LLONG_MAX : v2.size());
 		return x1 < x2;
@@ -65,14 +65,14 @@ void DPLL::init() {
 	int idx = 0;
 	for (auto &v : clauses) {
 		cout << '[' << idx++ << ']' << ' ';
-		for (auto x : v) std::cout << x << ' ';
-		std::cout << std::endl;
+		for (auto x : v) cout << x << ' ';
+		cout << endl;
 	}
 	#endif
 }
 
 // #Set a variable
-void DPLL::set_variable(int x, int cid) {
+void SatSolver::set_variable(int x, int cid) {
 	auto &state = stk.top();
 //	assert(state.var(x).has_value() == false);
 
@@ -87,7 +87,7 @@ void DPLL::set_variable(int x, int cid) {
 }
 
 // #Watch not false
-void DPLL::watch_not_false(int &self, int &other, int i, int false_literal) {
+void SatSolver::watch_not_false(int &self, int &other, int i, int false_literal) {
 	// TODO: maybe don't just check false_literal
 //	auto is_false_literal = [](auto &state, int x) {
 //		return state.var(x).has_value() and *state.var(x) != (x > 0);
@@ -101,7 +101,7 @@ void DPLL::watch_not_false(int &self, int &other, int i, int false_literal) {
 	// already watching at not false literal
 	if (clauses[i][self] != false_literal) return;
 
-	for (size_t j = std::max(self, other) + 1; j < clauses[i].size(); j++) {
+	for (size_t j = max(self, other) + 1; j < clauses[i].size(); j++) {
 		auto &var = stk.top().var(clauses[i][j]);
 		if (!var.has_value()) {
 			// not false
@@ -117,7 +117,7 @@ void DPLL::watch_not_false(int &self, int &other, int i, int false_literal) {
 }
 
 // #Watch is true
-bool DPLL::watch_is_true(int watched, int i) {
+bool SatSolver::watch_is_true(int watched, int i) {
 	auto &var = stk.top().var(clauses[i][watched]);
 	if (var.has_value() and *var == (clauses[i][watched] > 0)) {
 		return true;
@@ -126,7 +126,7 @@ bool DPLL::watch_is_true(int watched, int i) {
 }
 
 // #Resolve
-void DPLL::resolve(vector<int> &C, int p) {
+void SatSolver::resolve(vector<int> &C, int p) {
 	assert(p != 0);
 	int cid = antecedent[abs(p)];
 	assert(cid != -1);
@@ -143,7 +143,7 @@ void DPLL::resolve(vector<int> &C, int p) {
 }
 
 // #First UIP
-vector<int> DPLL::FirstUIP(int cid) {
+vector<int> SatSolver::FirstUIP(int cid) {
 	int cur_level = stk.size();
 	auto C = clauses[cid];
 
@@ -173,7 +173,7 @@ vector<int> DPLL::FirstUIP(int cid) {
 }
 
 // #Conflict learning
-void DPLL::conflict_learning(int cid) {
+void SatSolver::conflict_learning(int cid) {
 	auto C = FirstUIP(cid);
 
 	// find second max decision level in C
@@ -208,7 +208,7 @@ void DPLL::conflict_learning(int cid) {
 }
 
 // #Update
-void DPLL::update() {
+void SatSolver::update() {
 	// update the clause
 	auto &state = stk.top();
 	for (int &i = state.num_clauses; i < num_clauses; i++) {
@@ -236,7 +236,7 @@ void DPLL::update() {
 }
 
 // #Unit propagate
-bool DPLL::unit_propagate(int cid) {
+bool SatSolver::unit_propagate(int cid) {
 	auto false_literal = prop.front();
 	auto &state = stk.top();
 
@@ -255,7 +255,7 @@ bool DPLL::unit_propagate(int cid) {
 	watch_not_false(lb, la, cid, false_literal);
 
 	// check if this became unit clause (implication)
-	if (la == -1) std::swap(la, lb);
+	if (la == -1) swap(la, lb);
 	if (la != -1 and lb == -1) {
 		int last = clauses[cid][la];
 
@@ -274,14 +274,14 @@ bool DPLL::unit_propagate(int cid) {
 	#ifdef DEBUG
 	assert((la == -1) == (lb == -1));
 	what_is(false_literal);
-	std::cout << "[col: " << cid << "]\n" << state;
+	cout << "[col: " << cid << "]\n" << state;
 	#endif
 
 	return true;
 }
 
 // #BCP
-int DPLL::bcp() {
+int SatSolver::bcp() {
 	#ifdef DEBUG
 	cout << endl;
 	what_is(stk.size());
@@ -300,7 +300,7 @@ int DPLL::bcp() {
 }
 
 // #Conflict-driven clause learning
-std::optional<std::vector<int>> DPLL::solve() {
+optional<vector<int>> SatSolver::solve() {
 	// 0. init
 	init();
 
@@ -308,7 +308,7 @@ std::optional<std::vector<int>> DPLL::solve() {
 		// 1. BCP
 		if (int cid = bcp(); cid != -1) {
 			if (stk.size() == 1) {
-				return std::nullopt;
+				return nullopt;
 			}
 			conflict_learning(cid);
 			continue;
@@ -327,15 +327,27 @@ std::optional<std::vector<int>> DPLL::solve() {
 	}
 
 	// 4. SAT: return ans;
-	auto res = std::vector<int>(num_vars);
+	auto res = vector<int>(num_vars);
 	auto &state = stk.top();
 
 	for (int i = 1; i <= num_vars; i++) {
-		if (state.var(i) and *state.var(i)) {
-			res[i-1] = i;
-		} else {
-			res[i-1] = -i;
-		}
+		res[i - 1] = state.var(i).value_or(true) ? i : -i;
 	}
 	return res;
+}
+
+// #operator<<
+ostream& operator<< (ostream &os, SatSolver &solver) {
+	if (auto res = solver.solve(); res) {
+		cout << "[SAT]" << endl;
+		os << "s SATISFIABLE\n";
+		os << 'v';
+		for (auto x : *res) os << ' ' << x;
+		os << " 0\n";
+	} else {
+		cout << "[UNSAT]" << endl;
+		os << "s UNSATISFIABLE\n";
+	}
+
+	return os;
 }

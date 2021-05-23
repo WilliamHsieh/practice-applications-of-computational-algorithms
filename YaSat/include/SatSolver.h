@@ -3,10 +3,9 @@
 
 struct State;
 
-// TODO: rename to SatSolver
-struct DPLL {
+struct SatSolver {
 	// constructor
-	DPLL(int, std::vector<std::vector<int>>&);
+	SatSolver(std::string&);
 
 	// function
 	void init();
@@ -22,14 +21,15 @@ struct DPLL {
 	void conflict_learning(int);
 	void update();
 	void set_variable(int, int cid = -1);
+	friend std::ostream& operator<< (std::ostream&, SatSolver&);
 
 	// member
 	int num_vars;
 	int num_clauses;
-	std::queue<int> prop;
+	std::vector<std::vector<int>> clauses;
 	std::stack<State, std::vector<State>> stk;
+	std::queue<int> prop;
 	std::vector<int> decision_level;
 	std::vector<int> antecedent;
 	std::vector<int> timestamp;
-	std::vector<std::vector<int>> &clauses;
 };
