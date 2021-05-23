@@ -1,6 +1,6 @@
 #include <bits/stdc++.h>
 #include "parser.h"
-#include "dpll.hpp"
+#include "dpll.h"
 
 using namespace std;
 
