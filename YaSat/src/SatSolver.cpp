@@ -73,6 +73,8 @@ void SatSolver::init() {
 
 // #Set a variable
 void SatSolver::set_variable(int x, int cid) {
+	if (x == 0) return;
+
 	auto &state = stk.top();
 //	assert(state.var(x).has_value() == false);
 
@@ -80,40 +82,28 @@ void SatSolver::set_variable(int x, int cid) {
 	if (cid == -1) state.time = 0;
 	state.var(x) = (x >= 0);
 
-	prop.push(-x);
 	decision_level[abs(x)] = stk.size();
 	antecedent[abs(x)] = cid;
 	timestamp[abs(x)] = state.time++;
 }
 
 // #Watch not false
-void SatSolver::watch_not_false(int &self, int &other, int i, int false_literal) {
-	// TODO: maybe don't just check false_literal
-//	auto is_false_literal = [](auto &state, int x) {
-//		return state.var(x).has_value() and *state.var(x) != (x > 0);
-//	};
-//	if (!is_false_literal(stk.top(), clauses[i][self])) {
-//		what_is(clauses[i][self]);
-//		what_is(*stk.top().var(clauses[i][self]));
-//		return;
-//	}
-
+void SatSolver::watch_not_false(int &self, int &other, int cid) {
 	// already watching at not false literal
-	if (clauses[i][self] != false_literal) return;
+	if (!stk.top().var(clauses[cid][self]).has_value()) return;
 
-	for (size_t j = max(self, other) + 1; j < clauses[i].size(); j++) {
-		auto &var = stk.top().var(clauses[i][j]);
+	for (size_t j = max(self, other) + 1; j < clauses[cid].size(); j++) {
+		auto &var = stk.top().var(clauses[cid][j]);
 		if (!var.has_value()) {
 			// not false
 			self = j;
 			return;
-		} else if (*var == (clauses[i][j] > 0)) {
+		} else if (*var == (clauses[cid][j] > 0)) {
 			// true
 			self = other = -1;
 			return;
 		}
 	}
-	self = -1;
 }
 
 // #Watch is true
@@ -127,9 +117,7 @@ bool SatSolver::watch_is_true(int watched, int i) {
 
 // #Resolve
 void SatSolver::resolve(vector<int> &C, int p) {
-	assert(p != 0);
 	int cid = antecedent[abs(p)];
-	assert(cid != -1);
 
 	// merge C and antecedent of p
 	copy(all(clauses[cid]), back_inserter(C));
@@ -223,21 +211,10 @@ void SatSolver::update() {
 			timestamp[i] = -1;
 		}
 	}
-
-	// clear the prop queue
-	if (prop.size()) prop = {};
-	int implied = 0;
-	for (auto &x : clauses.back()) if (!state.var(x).has_value()) {
-		state.watch.back() = {-1, -1};
-		implied = x;
-		break;
-	}
-	set_variable(implied, num_clauses - 1);
 }
 
 // #Unit propagate
-bool SatSolver::unit_propagate(int cid) {
-	auto false_literal = prop.front();
+bool SatSolver::unit_propagate(int cid, bool &modified) {
 	auto &state = stk.top();
 
 	// this clause is already satisfied
@@ -251,29 +228,33 @@ bool SatSolver::unit_propagate(int cid) {
 	}
 
 	// update watching literals that are not false
-	watch_not_false(la, lb, cid, false_literal);
-	watch_not_false(lb, la, cid, false_literal);
+	watch_not_false(la, lb, cid);
+	watch_not_false(lb, la, cid);
 
 	// check if this became unit clause (implication)
-	if (la == -1) swap(la, lb);
-	if (la != -1 and lb == -1) {
-		int last = clauses[cid][la];
-
-		// conflict
-		if (state.var(last) and *state.var(last) != (last > 0)) {
+	if (la != -1 and lb != -1) {
+		// both are false literal -> conflict
+		if (state.var(clauses[cid][la]) and state.var(clauses[cid][lb])) {
 			return false;
-		}
 
-		// imply
-		set_variable(last, cid);
-		la = -1;
+		// imply lb
+		} else if (state.var(clauses[cid][la])) {
+			set_variable(clauses[cid][lb], cid);
+			la = lb = -1;
+			modified = true;
+
+		// imply la
+		} else if (state.var(clauses[cid][lb])) {
+			set_variable(clauses[cid][la], cid);
+			la = lb = -1;
+			modified = true;
+		}
 	}
 	if (la != -1 or lb != -1) state.done = false;
 
 	// output debug info
 	#ifdef DEBUG
 	assert((la == -1) == (lb == -1));
-	what_is(false_literal);
 	cout << "[col: " << cid << "]\n" << state;
 	#endif
 
@@ -288,10 +269,12 @@ int SatSolver::bcp() {
 	#endif
 
 	//TODO: change to look up all variable
-	for ( ; !prop.empty(); prop.pop()) {
+	for (bool modified = true; modified; ) {
 		stk.top().done = true;
-		for (int i = 0; i < num_clauses; i++) {
-			if (unit_propagate(i) == false) {
+		modified = false;
+//		for (int i = 0; i < num_clauses; i++) {
+		for (int i = num_clauses - 1; i >= 0; i--) {
+			if (unit_propagate(i, modified) == false) {
 				return i;
 			}
 		}
@@ -307,9 +290,10 @@ optional<vector<int>> SatSolver::solve() {
 	while (!stk.empty()) {
 		// 1. BCP
 		if (int cid = bcp(); cid != -1) {
-			if (stk.size() == 1) {
-				return nullopt;
-			}
+			// UNSAT
+			if (stk.size() == 1) return nullopt;
+
+			// non-chronological backtracking
 			conflict_learning(cid);
 			continue;
 		}

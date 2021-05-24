@@ -9,9 +9,9 @@ struct SatSolver {
 
 	// function
 	void init();
-	void watch_not_false(int&, int&, int, int);
+	void watch_not_false(int&, int&, int);
 	bool watch_is_true(int, int);
-	bool unit_propagate(int);
+	bool unit_propagate(int, bool&);
 	int bcp();
 	bool backtrack();
 	std::optional<std::vector<int>> solve();
@@ -28,7 +28,6 @@ struct SatSolver {
 	int num_clauses;
 	std::vector<std::vector<int>> clauses;
 	std::stack<State, std::vector<State>> stk;
-	std::queue<int> prop;
 	std::vector<int> decision_level;
 	std::vector<int> antecedent;
 	std::vector<int> timestamp;
