@@ -6,7 +6,6 @@ struct State {
 
 	// function
 	std::optional<bool>& var(int);
-	int pick_variable();
 	friend std::ostream& operator<< (std::ostream&, State&);
 
 	// member

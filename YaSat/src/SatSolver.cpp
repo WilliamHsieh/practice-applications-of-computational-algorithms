@@ -15,42 +15,26 @@ SatSolver::SatSolver(string &fname) {
 	decision_level.assign(num_vars + 1, 0);
 	antecedent.assign(num_vars + 1, -1);
 	timestamp.assign(num_vars + 1, -1);
+	VSIDS.assign(num_vars + 1, 0.0);
 }
 
 // #Initialize
 void SatSolver::init() {
 	assert(clauses.size() != 0);
-	// remove both -x or x exist clause && make literal unique
-	// TODO: should be written more efficient
+	// remove clause if both -x and x exist && make literal unique
+	auto tmp = vector<vector<int>>{};
 	for (auto &v : clauses) {
 		auto s = set<int>(all(v));
-		int idx = 0, ok = true;
-		for (auto x : s) {
-			if (s.count(-x)) {
-				ok = false;
-				break;
-			}
-			v[idx++] = x;
+		bool ok = true;
+		for (auto x : s) if (s.count(-x)) {
+			ok = false;
+			break;
 		}
 
-		if (!ok) {
-			v = vector(1, 0); //TODO: get rid of this
-		} else {
-			v.resize(s.size());
-		}
+		if (ok) tmp.emplace_back(all(s));
 	}
-
-	// TODO: should be deleted after implementing pick_variable
-	sort(all(clauses), [](const vector<int> &v1, const vector<int> &v2) {
-		auto x1 = (v1.size() == 1 ? LLONG_MAX : v1.size());
-		auto x2 = (v2.size() == 1 ? LLONG_MAX : v2.size());
-		return x1 < x2;
-//TODO: why wrong?
-//		if (v1.size() == 1 and v2.size() == 1) return true;
-//		if (v2.size() == 1) return true;
-//		if (v1.size() == 1) return false;
-//		return v1.size() < v2.size();
-	});
+	clauses.swap(tmp);
+	num_clauses = clauses.size();
 
 	// assign unit clauses as decision
 	auto &state = stk.emplace(num_vars, num_clauses);
@@ -58,6 +42,13 @@ void SatSolver::init() {
 		if (clauses[i].size() == 1) {
 			state.watch[i] = {-1, -1};
 			set_variable(clauses[i][0], i);
+		}
+	}
+
+	// initialize VSIDS
+	for (auto &v : clauses) {
+		for (auto &x : v) {
+			VSIDS[abs(x)] += 1;
 		}
 	}
 
@@ -85,6 +76,39 @@ void SatSolver::set_variable(int x, int cid) {
 	decision_level[abs(x)] = stk.size();
 	antecedent[abs(x)] = cid;
 	timestamp[abs(x)] = state.time++;
+
+	// VSIDS decay
+	const double decay = 0.95;
+	if (cid == -1) {
+		for (auto &p : VSIDS) {
+			p *= decay;
+		}
+	}
+}
+
+// #Pick a variable
+int SatSolver::pick_variable() {
+	static auto gen = std::default_random_engine(std::random_device{}());
+	static auto dis = std::uniform_int_distribution<int>(0, 1);
+
+	const double random_threshold = 0.01;
+	int choice = 0;
+	VSIDS[0] = 0;
+	for (int g = 1; g <= num_vars; g++) if (!stk.top().var(g)) {
+		// randomly pick between all max_element
+		if (VSIDS[g] >= VSIDS[choice] and VSIDS[g] - VSIDS[choice] > random_threshold) {
+			choice = g;
+		} else if (abs(VSIDS[g] - VSIDS[choice]) <= random_threshold) {
+			choice = dis(gen) ? choice : g;
+		}
+	}
+
+	if (choice == 0) {
+		std::cerr << "shouldn't reach here!\n";
+		for (auto x : VSIDS) cerr << x << ' ';
+		return -1;
+	}
+	return choice;
 }
 
 // #Watch not false
@@ -182,6 +206,9 @@ void SatSolver::conflict_learning(int cid) {
 	}
 	sort(all(C));
 	while (C.back() == INT_MAX) C.pop_back();
+
+	// VSIDS bump
+	for (int p : C) VSIDS[abs(p)] += 1;
 
 	// find second max decision level in C
 	int cur_level = stk.size();
@@ -292,11 +319,10 @@ int SatSolver::bcp() {
 	what_is(stk.size());
 	#endif
 
-	//TODO: change to look up all variable
 	for (bool modified = true; modified; ) {
 		stk.top().done = true;
 		modified = false;
-//		for (int i = 0; i < num_clauses; i++) {
+
 		for (int i = num_clauses - 1; i >= 0; i--) {
 			if (unit_propagate(i, modified) == false) {
 				return i;
@@ -326,7 +352,7 @@ optional<vector<int>> SatSolver::solve() {
 		if (stk.top().done) break;
 
 		// 3. if not, apply new decision
-		if (int g = stk.top().pick_variable(); g != -1) {
+		if (int g = pick_variable(); g != -1) {
 			stk.push(stk.top());
 			set_variable(g);
 		} else {

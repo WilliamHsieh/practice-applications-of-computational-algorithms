@@ -21,6 +21,7 @@ struct SatSolver {
 	void conflict_learning(int);
 	void update();
 	void set_variable(int, int cid = -1);
+	int pick_variable();
 	friend std::ostream& operator<< (std::ostream&, SatSolver&);
 
 	// member
@@ -31,4 +32,5 @@ struct SatSolver {
 	std::vector<int> decision_level;
 	std::vector<int> antecedent;
 	std::vector<int> timestamp;
+	std::vector<double> VSIDS;
 };
