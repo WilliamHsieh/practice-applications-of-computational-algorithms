@@ -164,6 +164,25 @@ vector<int> SatSolver::FirstUIP(int cid) {
 void SatSolver::conflict_learning(int cid) {
 	auto C = FirstUIP(cid);
 
+	// Conflict clause minimization
+	for (int &p : C) {
+		if (antecedent[abs(p)] < 0) continue;
+
+		bool exist = true;
+		for (auto &p_bar : clauses[antecedent[abs(p)]]) {
+			if (p == -p_bar) continue;
+			if (p == p_bar or find(all(C), p_bar) == end(C)) {
+				exist = false;
+				break;
+			}
+		}
+
+		// remove p from C
+		if (exist) p = INT_MAX;
+	}
+	sort(all(C));
+	while (C.back() == INT_MAX) C.pop_back();
+
 	// find second max decision level in C
 	int cur_level = stk.size();
 	int lvl = 1;
