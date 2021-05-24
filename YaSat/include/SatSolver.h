@@ -32,5 +32,5 @@ struct SatSolver {
 	std::vector<int> decision_level;
 	std::vector<int> antecedent;
 	std::vector<int> timestamp;
-	std::vector<double> VSIDS;
+	std::vector<std::array<double, 2>> VSIDS;
 };

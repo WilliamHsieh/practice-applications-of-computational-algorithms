@@ -15,7 +15,7 @@ SatSolver::SatSolver(string &fname) {
 	decision_level.assign(num_vars + 1, 0);
 	antecedent.assign(num_vars + 1, -1);
 	timestamp.assign(num_vars + 1, -1);
-	VSIDS.assign(num_vars + 1, 0.0);
+	VSIDS.assign(num_vars + 1, {0.0, 0.0});
 }
 
 // #Initialize
@@ -48,7 +48,7 @@ void SatSolver::init() {
 	// initialize VSIDS
 	for (auto &v : clauses) {
 		for (auto &x : v) {
-			VSIDS[abs(x)] += 1;
+			VSIDS[abs(x)][x > 0] += 1;
 		}
 	}
 
@@ -81,7 +81,8 @@ void SatSolver::set_variable(int x, int cid) {
 	const double decay = 0.95;
 	if (cid == -1) {
 		for (auto &p : VSIDS) {
-			p *= decay;
+			p[0] *= decay;
+			p[1] *= decay;
 		}
 	}
 }
@@ -91,22 +92,27 @@ int SatSolver::pick_variable() {
 	static auto gen = std::default_random_engine(std::random_device{}());
 	static auto dis = std::uniform_int_distribution<int>(0, 1);
 
-	const double random_threshold = 0.01;
 	int choice = 0;
-	VSIDS[0] = 0;
+	VSIDS[0][0] = VSIDS[0][1] = 0;
 	for (int g = 1; g <= num_vars; g++) if (!stk.top().var(g)) {
 		// randomly pick between all max_element
-		if (VSIDS[g] >= VSIDS[choice] and VSIDS[g] - VSIDS[choice] > random_threshold) {
+		if (VSIDS[g][0] + VSIDS[g][1] > VSIDS[choice][0] + VSIDS[choice][1]) {
 			choice = g;
-		} else if (abs(VSIDS[g] - VSIDS[choice]) <= random_threshold) {
+		} else if (VSIDS[g][0] + VSIDS[g][1] == VSIDS[choice][0] + VSIDS[choice][1]) {
 			choice = dis(gen) ? choice : g;
 		}
 	}
 
 	if (choice == 0) {
 		std::cerr << "shouldn't reach here!\n";
-		for (auto x : VSIDS) cerr << x << ' ';
-		return -1;
+		for (auto x : VSIDS) cerr << x[0] + x[1] << ' ';
+		return 0;
+	}
+
+	if (VSIDS[choice][1] < VSIDS[choice][0]) {
+		choice = -choice;
+	} else if (VSIDS[choice][1] == VSIDS[choice][0]) {
+		choice = dis(gen) ? choice : -choice;
 	}
 	return choice;
 }
@@ -208,7 +214,7 @@ void SatSolver::conflict_learning(int cid) {
 	while (C.back() == INT_MAX) C.pop_back();
 
 	// VSIDS bump
-	for (int p : C) VSIDS[abs(p)] += 1;
+	for (int p : C) VSIDS[abs(p)][p > 0] += 1;
 
 	// find second max decision level in C
 	int cur_level = stk.size();
@@ -312,7 +318,7 @@ bool SatSolver::unit_propagate(int cid, bool &modified) {
 	return true;
 }
 
-// #BCP
+// #Boolean constraint propagation
 int SatSolver::bcp() {
 	#ifdef DEBUG
 	cout << endl;
@@ -352,7 +358,7 @@ optional<vector<int>> SatSolver::solve() {
 		if (stk.top().done) break;
 
 		// 3. if not, apply new decision
-		if (int g = pick_variable(); g != -1) {
+		if (int g = pick_variable(); g != 0) {
 			stk.push(stk.top());
 			set_variable(g);
 		} else {
