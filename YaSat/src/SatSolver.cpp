@@ -219,7 +219,12 @@ void SatSolver::update() {
 	// update the clause
 	auto &state = stk.top();
 	for (int &i = state.num_clauses; i < num_clauses; i++) {
-		state.watch.emplace_back(array{0, 1});
+		if (clauses[i].size() == 1) {
+			state.watch.emplace_back(array{-1, -1});
+			set_variable(clauses[i][0], i);
+		} else {
+			state.watch.emplace_back(array{0, 1});
+		}
 	}
 
 	// update decision_level and antecedent and timestamp
