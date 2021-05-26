@@ -27,6 +27,8 @@ struct SatSolver {
 	// member
 	int num_vars;
 	int num_clauses;
+	int orig_clauses;
+	int max_clauses;
 	std::vector<std::vector<int>> clauses;
 	std::stack<State, std::vector<State>> stk;
 	std::vector<int> decision_level;

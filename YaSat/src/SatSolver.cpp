@@ -3,7 +3,7 @@
 #include "state.h"
 #include "SatSolver.h"
 #define all(x) begin(x),end(x)
-#define what_is(x) std::cout << "[what] " << #x << " is " << x << std::endl
+#define what_is(x) std::cerr << "[what] " << #x << " is " << x << std::endl
 #define exec(x) std::cout << "[exec] " << #x << std::endl; x
 
 using namespace std;
@@ -22,19 +22,22 @@ SatSolver::SatSolver(string &fname) {
 void SatSolver::init() {
 	assert(clauses.size() != 0);
 	// remove clause if both -x and x exist && make literal unique
+	max_clauses = 0;
 	auto tmp = vector<vector<int>>{};
 	for (auto &v : clauses) {
 		auto s = set<int>(all(v));
-		bool ok = true;
-		for (auto x : s) if (s.count(-x)) {
-			ok = false;
-			break;
-		}
+		bool ok = find_if(all(s), [&](int x) {
+			return s.count(-x);
+		}) == s.end();
 
-		if (ok) tmp.emplace_back(all(s));
+		if (ok) {
+			tmp.emplace_back(all(s));
+			max_clauses = max(max_clauses, static_cast<int>(s.size()));
+		}
 	}
 	clauses.swap(tmp);
 	num_clauses = clauses.size();
+	orig_clauses = num_clauses;
 
 	// assign unit clauses as decision
 	auto &state = stk.emplace(num_vars, num_clauses);
@@ -249,7 +252,27 @@ void SatSolver::conflict_learning(int cid) {
 
 // #Update
 void SatSolver::update() {
-	// update the clause
+	// prune large clauses
+//	if (num_clauses > 2 * orig_clauses) {
+//		what_is(clauses.size());
+//		clauses.erase(remove_if(orig_clauses + all(clauses), [&](vector<int> &v) {
+//			return v.size() > 3 * max_clauses;
+//		}), clauses.end());
+//		what_is(clauses.size());
+
+//		num_clauses = clauses.size();
+//		stk.top().watch.resize(num_clauses);
+//		stk.top().num_clauses = num_clauses;
+//	}
+
+	// random restart
+//	static int conflict_cnt = 0;
+//	if (++conflict_cnt == 100) {
+//		conflict_cnt = 0;
+//		while (stk.size() > 1) stk.pop();
+//	}
+
+	// update the watched literal
 	auto &state = stk.top();
 	for (int &i = state.num_clauses; i < num_clauses; i++) {
 		if (clauses[i].size() == 1) {
