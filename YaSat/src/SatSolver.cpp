@@ -362,7 +362,7 @@ int SatSolver::bcp() {
 }
 
 // #Conflict-driven clause learning
-optional<vector<int>> SatSolver::solve() {
+result_type SatSolver::solve() {
 	// 0. init
 	init();
 
@@ -370,7 +370,7 @@ optional<vector<int>> SatSolver::solve() {
 		// 1. BCP
 		if (int cid = bcp(); cid != -1) {
 			// UNSAT
-			if (stk.size() == 1) return nullopt;
+			if (stk.size() == 1) return {};
 
 			// non-chronological backtracking
 			conflict_learning(cid);
@@ -390,7 +390,7 @@ optional<vector<int>> SatSolver::solve() {
 	}
 
 	// 4. SAT: return ans;
-	auto res = vector<int>(num_vars);
+	auto res = result_type(num_vars);
 	auto &state = stk.top();
 
 	for (int i = 1; i <= num_vars; i++) {
@@ -399,13 +399,13 @@ optional<vector<int>> SatSolver::solve() {
 	return res;
 }
 
-// #operator<<
-ostream& operator<< (ostream &os, SatSolver &solver) {
-	if (auto res = solver.solve(); res) {
+// #operator<< for result_type
+ostream& operator<< (ostream &os, result_type &res) {
+	if (!res.empty()) {
 		cout << "[SAT]" << endl;
 		os << "s SATISFIABLE\n";
 		os << 'v';
-		for (auto x : *res) os << ' ' << x;
+		for (auto x : res) os << ' ' << x;
 		os << " 0\n";
 	} else {
 		cout << "[UNSAT]" << endl;

@@ -3,6 +3,13 @@
 
 struct State;
 
+struct result_type : std::vector<int> {
+	result_type() = default;
+	result_type(int n) : std::vector<int>(n) {}
+
+	friend std::ostream& operator<< (std::ostream&, result_type&);
+};
+
 struct SatSolver {
 	// constructor
 	SatSolver(std::string&);
@@ -14,7 +21,7 @@ struct SatSolver {
 	bool unit_propagate(int, bool&);
 	int bcp();
 	bool backtrack();
-	std::optional<std::vector<int>> solve();
+	result_type solve();
 
 	void resolve(std::vector<int>&, int);
 	std::vector<int> FirstUIP(int);
@@ -22,7 +29,6 @@ struct SatSolver {
 	void update();
 	void set_variable(int, int cid = -1);
 	int pick_variable();
-	friend std::ostream& operator<< (std::ostream&, SatSolver&);
 
 	// member
 	bool done;
