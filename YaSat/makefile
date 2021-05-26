@@ -25,7 +25,7 @@ test: $(TARGET) $(CHECKER)
 $(QUEEN): $(SCRIPT_DIR)$(QUEEN).cpp
 	$(CC) $(CCFLAGS) -o $@ $^
 
-$(CHECKER): $(SCRIPT_DIR)check.cpp obj/parser.o
+$(CHECKER): $(SCRIPT_DIR)$(CHECKER).cpp obj/parser.o
 	$(CC) $(CCFLAGS) -o $@ $^
 
 $(TARGET): $(OBJ_FILES)
@@ -36,4 +36,4 @@ $(OBJ_DIR)%.o: $(SRC_DIR)%.cpp makefile
 	$(CC) $(CCFLAGS) -c -o $@ $<
 
 clean:
-	rm -rf $(OBJ_DIR) $(TARGET) $(CHECKER)
+	rm -rf $(OBJ_DIR) $(TARGET) $(CHECKER) $(QUEEN)
