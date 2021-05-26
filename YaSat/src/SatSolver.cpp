@@ -73,12 +73,12 @@ void SatSolver::set_variable(int x, int cid) {
 //	assert(state.var(x).has_value() == false);
 
 	// if this is a new decision, reset time
-	if (cid == -1) state.time = 0;
+	if (cid == -1) time = 0;
 	state.var(x) = (x >= 0);
 
 	decision_level[abs(x)] = stk.size();
 	antecedent[abs(x)] = cid;
-	timestamp[abs(x)] = state.time++;
+	timestamp[abs(x)] = time++;
 
 	// VSIDS decay
 	const double decay = 0.95;
@@ -274,7 +274,7 @@ void SatSolver::update() {
 
 	// update the watched literal
 	auto &state = stk.top();
-	for (int &i = state.num_clauses; i < num_clauses; i++) {
+	for (int i = state.watch.size(); i < num_clauses; i++) {
 		if (clauses[i].size() == 1) {
 			state.watch.emplace_back(array{-1, -1});
 			set_variable(clauses[i][0], i);
@@ -330,7 +330,7 @@ bool SatSolver::unit_propagate(int cid, bool &modified) {
 			modified = true;
 		}
 	}
-	if (la != -1 or lb != -1) state.done = false;
+	if (la != -1 or lb != -1) done = false;
 
 	// output debug info
 	#ifdef DEBUG
@@ -349,7 +349,7 @@ int SatSolver::bcp() {
 	#endif
 
 	for (bool modified = true; modified; ) {
-		stk.top().done = true;
+		done = true;
 		modified = false;
 
 		for (int i = num_clauses - 1; i >= 0; i--) {
@@ -378,7 +378,7 @@ optional<vector<int>> SatSolver::solve() {
 		}
 
 		// 2. check if curent state is satisfied already
-		if (stk.top().done) break;
+		if (done) break;
 
 		// 3. if not, apply new decision
 		if (int g = pick_variable(); g != 0) {

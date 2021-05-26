@@ -4,11 +4,8 @@
 using namespace std;
 
 // #Constructor
-State::State(int num_vars_, int num_clauses_)
-	: done(false),
-	  num_vars(num_vars_),
-	  num_clauses(num_clauses_),
-	  guess(num_vars + 1),
+State::State(int num_vars, int num_clauses)
+	: guess(num_vars + 1),
 	  watch(num_clauses, {0, 1})
 {}
 
@@ -33,7 +30,7 @@ std::ostream& operator<< (std::ostream &os, State &state) {
 	os << std::endl;
 
 	// show watched literal
-	for (int i = 0; i < state.num_clauses; i++) {
+	for (size_t i = 0; i < state.watch.size(); i++) {
 		auto &[la, lb] = state.watch[i];
 		os << '[' << i << "] " << la << ' ' << lb << std::endl;
 	}

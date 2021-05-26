@@ -25,6 +25,8 @@ struct SatSolver {
 	friend std::ostream& operator<< (std::ostream&, SatSolver&);
 
 	// member
+	bool done;
+	int time;
 	int num_vars;
 	int num_clauses;
 	int orig_clauses;
