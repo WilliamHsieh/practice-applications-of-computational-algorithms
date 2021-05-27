@@ -3,7 +3,7 @@
 #include "state.h"
 #include "SatSolver.h"
 #define all(x) begin(x),end(x)
-#define what_is(x) std::cout << "[what] " << #x << " is " << x << std::endl
+#define what_is(x) std::cerr << "[what] " << #x << " is " << x << std::endl
 #define exec(x) std::cout << "[exec] " << #x << std::endl; x
 
 using namespace std;
@@ -15,42 +15,29 @@ SatSolver::SatSolver(string &fname) {
 	decision_level.assign(num_vars + 1, 0);
 	antecedent.assign(num_vars + 1, -1);
 	timestamp.assign(num_vars + 1, -1);
+	VSIDS.assign(num_vars + 1, {0.0, 0.0});
 }
 
 // #Initialize
 void SatSolver::init() {
 	assert(clauses.size() != 0);
-	// remove both -x or x exist clause && make literal unique
-	// TODO: should be written more efficient
+	// remove clause if both -x and x exist && make literal unique
+	max_clauses = 0;
+	auto tmp = vector<vector<int>>{};
 	for (auto &v : clauses) {
 		auto s = set<int>(all(v));
-		int idx = 0, ok = true;
-		for (auto x : s) {
-			if (s.count(-x)) {
-				ok = false;
-				break;
-			}
-			v[idx++] = x;
-		}
+		bool ok = find_if(all(s), [&](int x) {
+			return s.count(-x);
+		}) == s.end();
 
-		if (!ok) {
-			v = vector(1, 0); //TODO: get rid of this
-		} else {
-			v.resize(s.size());
+		if (ok) {
+			tmp.emplace_back(all(s));
+			max_clauses = max(max_clauses, static_cast<int>(s.size()));
 		}
 	}
-
-	// TODO: should be deleted after implementing pick_variable
-	sort(all(clauses), [](const vector<int> &v1, const vector<int> &v2) {
-		auto x1 = (v1.size() == 1 ? LLONG_MAX : v1.size());
-		auto x2 = (v2.size() == 1 ? LLONG_MAX : v2.size());
-		return x1 < x2;
-//TODO: why wrong?
-//		if (v1.size() == 1 and v2.size() == 1) return true;
-//		if (v2.size() == 1) return true;
-//		if (v1.size() == 1) return false;
-//		return v1.size() < v2.size();
-	});
+	clauses.swap(tmp);
+	num_clauses = clauses.size();
+	orig_clauses = num_clauses;
 
 	// assign unit clauses as decision
 	auto &state = stk.emplace(num_vars, num_clauses);
@@ -58,6 +45,13 @@ void SatSolver::init() {
 		if (clauses[i].size() == 1) {
 			state.watch[i] = {-1, -1};
 			set_variable(clauses[i][0], i);
+		}
+	}
+
+	// initialize VSIDS
+	for (auto &v : clauses) {
+		for (auto &x : v) {
+			VSIDS[abs(x)][x > 0] += 1;
 		}
 	}
 
@@ -73,47 +67,76 @@ void SatSolver::init() {
 
 // #Set a variable
 void SatSolver::set_variable(int x, int cid) {
+	if (x == 0) return;
+
 	auto &state = stk.top();
 //	assert(state.var(x).has_value() == false);
 
 	// if this is a new decision, reset time
-	if (cid == -1) state.time = 0;
+	if (cid == -1) time = 0;
 	state.var(x) = (x >= 0);
 
-	prop.push(-x);
 	decision_level[abs(x)] = stk.size();
 	antecedent[abs(x)] = cid;
-	timestamp[abs(x)] = state.time++;
+	timestamp[abs(x)] = time++;
+
+	// VSIDS decay
+	const double decay = 0.95;
+	if (cid == -1) {
+		for (auto &p : VSIDS) {
+			p[0] *= decay;
+			p[1] *= decay;
+		}
+	}
+}
+
+// #Pick a variable
+int SatSolver::pick_variable() {
+	static auto gen = std::default_random_engine(std::random_device{}());
+	static auto dis = std::uniform_int_distribution<int>(0, 1);
+
+	int choice = 0;
+	VSIDS[0][0] = VSIDS[0][1] = 0;
+	for (int g = 1; g <= num_vars; g++) if (!stk.top().var(g)) {
+		// randomly pick between all max_element
+		if (VSIDS[g][0] + VSIDS[g][1] > VSIDS[choice][0] + VSIDS[choice][1]) {
+			choice = g;
+		} else if (VSIDS[g][0] + VSIDS[g][1] == VSIDS[choice][0] + VSIDS[choice][1]) {
+			choice = dis(gen) ? choice : g;
+		}
+	}
+
+	if (choice == 0) {
+		std::cerr << "shouldn't reach here!\n";
+		for (auto x : VSIDS) cerr << x[0] + x[1] << ' ';
+		return 0;
+	}
+
+	if (VSIDS[choice][1] < VSIDS[choice][0]) {
+		choice = -choice;
+	} else if (VSIDS[choice][1] == VSIDS[choice][0]) {
+		choice = dis(gen) ? choice : -choice;
+	}
+	return choice;
 }
 
 // #Watch not false
-void SatSolver::watch_not_false(int &self, int &other, int i, int false_literal) {
-	// TODO: maybe don't just check false_literal
-//	auto is_false_literal = [](auto &state, int x) {
-//		return state.var(x).has_value() and *state.var(x) != (x > 0);
-//	};
-//	if (!is_false_literal(stk.top(), clauses[i][self])) {
-//		what_is(clauses[i][self]);
-//		what_is(*stk.top().var(clauses[i][self]));
-//		return;
-//	}
-
+void SatSolver::watch_not_false(int &self, int &other, int cid) {
 	// already watching at not false literal
-	if (clauses[i][self] != false_literal) return;
+	if (!stk.top().var(clauses[cid][self]).has_value()) return;
 
-	for (size_t j = max(self, other) + 1; j < clauses[i].size(); j++) {
-		auto &var = stk.top().var(clauses[i][j]);
+	for (size_t j = max(self, other) + 1; j < clauses[cid].size(); j++) {
+		auto &var = stk.top().var(clauses[cid][j]);
 		if (!var.has_value()) {
 			// not false
 			self = j;
 			return;
-		} else if (*var == (clauses[i][j] > 0)) {
+		} else if (*var == (clauses[cid][j] > 0)) {
 			// true
 			self = other = -1;
 			return;
 		}
 	}
-	self = -1;
 }
 
 // #Watch is true
@@ -127,9 +150,7 @@ bool SatSolver::watch_is_true(int watched, int i) {
 
 // #Resolve
 void SatSolver::resolve(vector<int> &C, int p) {
-	assert(p != 0);
 	int cid = antecedent[abs(p)];
-	assert(cid != -1);
 
 	// merge C and antecedent of p
 	copy(all(clauses[cid]), back_inserter(C));
@@ -176,6 +197,28 @@ vector<int> SatSolver::FirstUIP(int cid) {
 void SatSolver::conflict_learning(int cid) {
 	auto C = FirstUIP(cid);
 
+	// Conflict clause minimization
+	for (int &p : C) {
+		if (antecedent[abs(p)] < 0) continue;
+
+		bool exist = true;
+		for (auto &p_bar : clauses[antecedent[abs(p)]]) {
+			if (p == -p_bar) continue;
+			if (p == p_bar or find(all(C), p_bar) == end(C)) {
+				exist = false;
+				break;
+			}
+		}
+
+		// remove p from C
+		if (exist) p = INT_MAX;
+	}
+	sort(all(C));
+	while (C.back() == INT_MAX) C.pop_back();
+
+	// VSIDS bump
+	for (int p : C) VSIDS[abs(p)][p > 0] += 1;
+
 	// find second max decision level in C
 	int cur_level = stk.size();
 	int lvl = 1;
@@ -209,10 +252,35 @@ void SatSolver::conflict_learning(int cid) {
 
 // #Update
 void SatSolver::update() {
-	// update the clause
+	// prune large clauses
+//	if (num_clauses > 2 * orig_clauses) {
+//		what_is(clauses.size());
+//		clauses.erase(remove_if(orig_clauses + all(clauses), [&](vector<int> &v) {
+//			return v.size() > 3 * max_clauses;
+//		}), clauses.end());
+//		what_is(clauses.size());
+
+//		num_clauses = clauses.size();
+//		stk.top().watch.resize(num_clauses);
+//		stk.top().num_clauses = num_clauses;
+//	}
+
+	// random restart
+//	static int conflict_cnt = 0;
+//	if (++conflict_cnt == 100) {
+//		conflict_cnt = 0;
+//		while (stk.size() > 1) stk.pop();
+//	}
+
+	// update the watched literal
 	auto &state = stk.top();
-	for (int &i = state.num_clauses; i < num_clauses; i++) {
-		state.watch.emplace_back(array{0, 1});
+	for (int i = state.watch.size(); i < num_clauses; i++) {
+		if (clauses[i].size() == 1) {
+			state.watch.emplace_back(array{-1, -1});
+			set_variable(clauses[i][0], i);
+		} else {
+			state.watch.emplace_back(array{0, 1});
+		}
 	}
 
 	// update decision_level and antecedent and timestamp
@@ -223,21 +291,10 @@ void SatSolver::update() {
 			timestamp[i] = -1;
 		}
 	}
-
-	// clear the prop queue
-	if (prop.size()) prop = {};
-	int implied = 0;
-	for (auto &x : clauses.back()) if (!state.var(x).has_value()) {
-		state.watch.back() = {-1, -1};
-		implied = x;
-		break;
-	}
-	set_variable(implied, num_clauses - 1);
 }
 
 // #Unit propagate
-bool SatSolver::unit_propagate(int cid) {
-	auto false_literal = prop.front();
+bool SatSolver::unit_propagate(int cid, bool &modified) {
 	auto &state = stk.top();
 
 	// this clause is already satisfied
@@ -251,47 +308,52 @@ bool SatSolver::unit_propagate(int cid) {
 	}
 
 	// update watching literals that are not false
-	watch_not_false(la, lb, cid, false_literal);
-	watch_not_false(lb, la, cid, false_literal);
+	watch_not_false(la, lb, cid);
+	watch_not_false(lb, la, cid);
 
 	// check if this became unit clause (implication)
-	if (la == -1) swap(la, lb);
-	if (la != -1 and lb == -1) {
-		int last = clauses[cid][la];
-
-		// conflict
-		if (state.var(last) and *state.var(last) != (last > 0)) {
+	if (la != -1 and lb != -1) {
+		// both are false literal -> conflict
+		if (state.var(clauses[cid][la]) and state.var(clauses[cid][lb])) {
 			return false;
-		}
 
-		// imply
-		set_variable(last, cid);
-		la = -1;
+		// imply lb
+		} else if (state.var(clauses[cid][la])) {
+			set_variable(clauses[cid][lb], cid);
+			la = lb = -1;
+			modified = true;
+
+		// imply la
+		} else if (state.var(clauses[cid][lb])) {
+			set_variable(clauses[cid][la], cid);
+			la = lb = -1;
+			modified = true;
+		}
 	}
-	if (la != -1 or lb != -1) state.done = false;
+	if (la != -1 or lb != -1) done = false;
 
 	// output debug info
 	#ifdef DEBUG
 	assert((la == -1) == (lb == -1));
-	what_is(false_literal);
 	cout << "[col: " << cid << "]\n" << state;
 	#endif
 
 	return true;
 }
 
-// #BCP
+// #Boolean constraint propagation
 int SatSolver::bcp() {
 	#ifdef DEBUG
 	cout << endl;
 	what_is(stk.size());
 	#endif
 
-	//TODO: change to look up all variable
-	for ( ; !prop.empty(); prop.pop()) {
-		stk.top().done = true;
-		for (int i = 0; i < num_clauses; i++) {
-			if (unit_propagate(i) == false) {
+	for (bool modified = true; modified; ) {
+		done = true;
+		modified = false;
+
+		for (int i = num_clauses - 1; i >= 0; i--) {
+			if (unit_propagate(i, modified) == false) {
 				return i;
 			}
 		}
@@ -300,25 +362,26 @@ int SatSolver::bcp() {
 }
 
 // #Conflict-driven clause learning
-optional<vector<int>> SatSolver::solve() {
+result_type SatSolver::solve() {
 	// 0. init
 	init();
 
 	while (!stk.empty()) {
 		// 1. BCP
 		if (int cid = bcp(); cid != -1) {
-			if (stk.size() == 1) {
-				return nullopt;
-			}
+			// UNSAT
+			if (stk.size() == 1) return {};
+
+			// non-chronological backtracking
 			conflict_learning(cid);
 			continue;
 		}
 
 		// 2. check if curent state is satisfied already
-		if (stk.top().done) break;
+		if (done) break;
 
 		// 3. if not, apply new decision
-		if (int g = stk.top().pick_variable(); g != -1) {
+		if (int g = pick_variable(); g != 0) {
 			stk.push(stk.top());
 			set_variable(g);
 		} else {
@@ -327,7 +390,7 @@ optional<vector<int>> SatSolver::solve() {
 	}
 
 	// 4. SAT: return ans;
-	auto res = vector<int>(num_vars);
+	auto res = result_type(num_vars);
 	auto &state = stk.top();
 
 	for (int i = 1; i <= num_vars; i++) {
@@ -336,13 +399,13 @@ optional<vector<int>> SatSolver::solve() {
 	return res;
 }
 
-// #operator<<
-ostream& operator<< (ostream &os, SatSolver &solver) {
-	if (auto res = solver.solve(); res) {
+// #operator<< for result_type
+ostream& operator<< (ostream &os, result_type &res) {
+	if (!res.empty()) {
 		cout << "[SAT]" << endl;
 		os << "s SATISFIABLE\n";
 		os << 'v';
-		for (auto x : *res) os << ' ' << x;
+		for (auto x : res) os << ' ' << x;
 		os << " 0\n";
 	} else {
 		cout << "[UNSAT]" << endl;

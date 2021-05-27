@@ -10,9 +10,9 @@ int main(int argc, char** argv) {
 	auto fsat = (argc == 3) ? std::string(argv[2]) : fcnf.substr(0, fcnf.size() - 3) + "sat";
 
 	// solve
-	auto solver = SatSolver(fcnf);
+	auto result = SatSolver(fcnf).solve();
 	auto fout = std::ofstream(fsat.data());
-	fout << solver;
+	fout << result;
 
 	return 0;
 }
