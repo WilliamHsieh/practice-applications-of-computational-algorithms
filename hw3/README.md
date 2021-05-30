@@ -139,7 +139,7 @@ $ ./viterbi data/input_200.txt ans
 $ diff data/output_200.txt ans
 202d201
 <
-sja
+```
 
 # Discussion
 * The assignment helps me a lot on getting an insight into the concept.
