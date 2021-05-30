@@ -32,6 +32,7 @@ Usage: ./viterbi infile outfile
 $ la viterbi
 -rwxr-xr-x 1 pwhsieh gcs 38K May 30 17:24 viterbi
 -rw
+```
 
 # Implementation
 1. main function
